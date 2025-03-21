@@ -159,14 +159,11 @@ if periodic_boundary_x and periodic_boundary_y and nmodes > 0:
     ups = 0 #1e1
     wavenumber = 2*np.pi*20
 
-    upsRot = 1e3
+    upsRot = 1e4
     coeffChiZ = 0 #0.01
-    wavenumberRot = 2*np.pi*50
+    wavenumberRot = 2*np.pi*100
 
     coeff=-2
-    coeffx=0
-    coeffy=0
-
     l_waveX = (l_x + coeff*dx)
     l_waveY = (l_y + coeff*dy)
     l_wave = (l_waveX*l_waveY)**0.5
@@ -282,6 +279,10 @@ def enforce_boundaries(arr, grid):
 
 for k in range(nmodes):
     phi[:,:,k] = enforce_boundaries(phi[:,:,k], 'h')
+    chix[:,:,k] = enforce_boundaries(chix[:,:,k], 'h')
+    chiy[:,:,k] = enforce_boundaries(chiy[:,:,k], 'h')
+
+
 
 vectx = np.zeros_like(phi)
 vecty = np.zeros_like(phi)
@@ -364,8 +365,9 @@ if nplots>0:
 
 print("Maximal value of norm us: ", np.max(np.sqrt(us[1:-1,1:-1]**2 + vs[1:-1,1:-1]**2)))
 print("Maximal value of div us: ", np.max(abs((us[1:-1,1:-1] - us[1:-1,:-2])/dx + (vs[1:-1,1:-1] - vs[:-2,1:-1])/dy)))
-print("Maximal value of norm chi: ", np.max(np.sqrt(chix[1:-1,1:-1]**2 + chiy[1:-1,1:-1]**2)))
-print("Maximal value of div chi: ", np.max(abs((chix[1:-1,1:-1] - chix[1:-1,:-2])/dx + (chiy[1:-1,1:-1] - chiy[:-2,1:-1])/dy)))
+'''print("Maximal value of norm chi: ", np.max(np.sqrt(chix[1:-1,1:-1,:]**2 + chiy[1:-1,1:-1,:]**2)))
+print("Maximal value of div chi: ", np.max(abs((chix[1:-1,1:-1,:] - chix[1:-1,:-2,:])/dx + (chiy[1:-1,1:-1,:] - chiy[:-2,1:-1,:])/dy)))
+print("Periodicity default of chix: ", np.max(abs(chix[1,:,7] - chix[-2,:,7]) + abs(chix[:,1,7] - chix[:,-2,7])))'''
 
 def export_to_csv(field, name):
     df = pd.DataFrame(field)
