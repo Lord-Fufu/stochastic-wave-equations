@@ -1,6 +1,9 @@
 Python codes to simulate stochastic wave equations, namely Saint-Venant, Boussinesq and Serre-Green-Naghdi under the LU formalism.
+The water waves equation is also implemented.
 
-The file 'shallow_water_nonlinear_modifiedConservativeTrueCgrid.py' allows to do it. Saint-Venant and Boussinesq are ok, Serre-Green-Naghdi is quite slow (should be optimized).
+The file 'shallow_water_nonlinear_modifiedConservativeTrueCgrid.py' allows to do it.
+Saint-Venant and Boussinesq are ok, Serre-Green-Naghdi is quite slow (should be optimized in the future).
 The files 'computeMeanAndVariance.py' and 'makeStatsPlots.py' generate and plot the statistics of the aforementioned models (respectively).
 
-The files 'water_waves_LU[...].py' are attemps to deal with the water waves LU equations. So far, even the deterministic setting does not work.
+The files 'water_waves_LU[...].py' deals with the water waves LU equations and its approximation.
+The main model (water waves) runs but is very slow. The approximations are faster, and are based on simplifications of the Dirichlet to Neumann operator.
