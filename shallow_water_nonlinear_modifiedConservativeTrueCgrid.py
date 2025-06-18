@@ -13,30 +13,32 @@ import numpy as np
 import matplotlib.pyplot as plt
 import imageio as iio
 import scipy.sparse as scsp
+from scipy.stats import truncnorm, truncexpon
 from fipy import numerix as nx
 import pandas as pd
 import os
 
 #Choose simulation type. Can be "Saint-Venant", "Boussinesq" or "Serre-Green-Naghdi".
-simulationType = "Serre-Green-Naghdi"
+simulationType = "Saint-Venant"
+
 
 n_data=1
 for i_trajectory in range(n_data):
-
+    
     #--------------------------------------------------------------------------------------------------------------
     #---------------------------------------------SIMULATION PARAMETERS-----------------------------------------------
     #--------------------------------------------------------------------------------------------------------------
 
     # maximum number of timesteps
-    itmax = float('infinity')
+    itmax = float('infinity') #700 
 
     # grid setup
-    n_x = 51
-    dx = 1e4
+    n_x = 201
+    dx = 5e1
     l_x = n_x * dx
 
-    n_y = 51
-    dy = 1e4
+    n_y = 201
+    dy = 5e1
     l_y = n_y * dy
 
     x, y = (
@@ -54,8 +56,8 @@ for i_trajectory in range(n_data):
     lateral_viscosity = 1e-3 * 2e-4 * dx ** 2
 
     #epsilon only impacts the wave height in this model --> maybe write it with adimensioned variables
-    eps=0.5
-    beta=0.1
+    eps=0.1
+    beta= depth/np.sqrt(l_x*l_y)
     amplitude = eps*depth
 
     # type of boundary conditions parameters (periodic or Dirichlet)
@@ -107,7 +109,7 @@ for i_trajectory in range(n_data):
     max_quivers = 41
 
     make_plots = True
-    save_plots = False
+    save_plots = True
     makegif = False
 
     plotNoiseDivergence = False
@@ -132,7 +134,7 @@ for i_trajectory in range(n_data):
         - h_geostrophy.mean()
         # small perturbation
         #+ 1 * np.sin(X / l_x * 10 * np.pi) * np.cos(Y / l_y * 8 * np.pi)
-        + amplitude*np.exp(-(10**(-9)*(X-l_x/3)**2 + 10**(-9)*(Y-l_y/3)**2)**2)
+        + amplitude*np.exp(-1e-10*((X-l_x/2)**2 + (Y-l_y/2)**2)**2)
         #+ amplitude*np.exp(-100 * (0.9*abs(Y / l_y - 0.5)**2+ ((Y/l_y - 0.5) - abs(X / l_x - 0.5)**(2/3))**2))
     )
 
@@ -146,7 +148,7 @@ for i_trajectory in range(n_data):
 
     if periodic_boundary_x and periodic_boundary_y:
         nmodes = 4
-        ups = 2e3
+        ups = 1e1
         wavenumber = 2*np.pi*2
 
         coeff=-2
@@ -156,15 +158,16 @@ for i_trajectory in range(n_data):
         l_ref = np.sqrt(l_x * l_y)
         l_waveX = (l_x + coeff*dx)
         l_waveY = (l_y + coeff*dy)
+        l_wave = (l_waveX*l_waveY)**0.5
 
-        phi1x = np.sqrt(ups)*l_waveX/l_ref*np.sin(wavenumber*((X+dx/2)/l_waveX+Y/l_waveY))
-        phi1y = -np.sqrt(ups)*l_waveY/l_ref*np.sin(wavenumber*(X/l_waveX+(Y+dy/2)/l_waveY))
-        phi2x = np.sqrt(ups)*l_waveX/l_ref*np.sin(wavenumber*((X+dx/2)/l_waveX-Y/l_waveY))
-        phi2y = np.sqrt(ups)*l_waveY/l_ref*np.sin(wavenumber*(X/l_waveX-(Y+dy/2)/l_waveY))
-        phi3x = np.sqrt(ups)*l_waveX/l_ref*np.cos(wavenumber*((X+dx/2)/l_waveX+Y/l_waveY))
-        phi3y = -np.sqrt(ups)*l_waveY/l_ref*np.cos(wavenumber*(X/l_waveX+(Y+dy/2)/l_waveY))
-        phi4x = np.sqrt(ups)*l_waveX/l_ref*np.cos(wavenumber*((X+dx/2)/l_waveX-Y/l_waveY))
-        phi4y = np.sqrt(ups)*l_waveY/l_ref*np.cos(wavenumber*(X/l_waveX-(Y+dy/2)/l_waveY))
+        phi1x =  np.sqrt(ups)*l_wave/l_ref*np.sin(wavenumber*(X/l_waveX+Y/l_waveY))
+        phi1y = -np.sqrt(ups)*l_wave/l_ref*np.sin(wavenumber*(X/l_waveX+Y/l_waveY))
+        phi2x =  np.sqrt(ups)*l_wave/l_ref*np.sin(wavenumber*(X/l_waveX-Y/l_waveY))
+        phi2y =  np.sqrt(ups)*l_wave/l_ref*np.sin(wavenumber*(X/l_waveX-Y/l_waveY))
+        phi3x =  np.sqrt(ups)*l_wave/l_ref*np.cos(wavenumber*(X/l_waveX+Y/l_waveY))
+        phi3y = -np.sqrt(ups)*l_wave/l_ref*np.cos(wavenumber*(X/l_waveX+Y/l_waveY))
+        phi4x =  np.sqrt(ups)*l_wave/l_ref*np.cos(wavenumber*(X/l_waveX-Y/l_waveY))
+        phi4y =  np.sqrt(ups)*l_wave/l_ref*np.cos(wavenumber*(X/l_waveX-Y/l_waveY))
 
         phix = np.zeros((n_y, n_x, nmodes))
         phix[1:-1,1:-1,0] = phi1x[1:-1,1:-1]
@@ -177,7 +180,6 @@ for i_trajectory in range(n_data):
         phiy[1:-1,1:-1,1] = phi2y[1:-1,1:-1]
         phiy[1:-1,1:-1,2] = phi3y[1:-1,1:-1]
         phiy[1:-1,1:-1,3] = phi4y[1:-1,1:-1]
-
 
     #--------------------------------------------------------------------------------------------------------------
     #----------------------------------------------NOISE PARAMETERS------------------------------------------------
@@ -406,6 +408,15 @@ for i_trajectory in range(n_data):
 
     print("Maximal value of div us: ", np.max(abs((us[1:-1,1:-1] - us[1:-1,:-2])/dx + (vs[1:-1,1:-1] - vs[:-2,1:-1])/dy)))
 
+    maxNoiseDivg = np.zeros_like(div_us)
+    maxNoiseDivg[1:-1,1:-1] = np.max(abs((phix[1:-1,2:,:] - phix[1:-1,:-2,:])/dx/2
+                                        +(phiy[2:,1:-1,:] - phiy[:-2,1:-1,:])/dy/2), axis=-1)
+    print("Maximal value of div phi: ", np.max(maxNoiseDivg))
+
+    print("Periodicity default of phix: ", np.max(abs(phix[1,:,:] - phix[-2,:,:]) + abs(phix[:,1,:] - phix[:,-2,:])))
+    print("Periodicity default of phiy: ", np.max(abs(phiy[1,:,:] - phiy[-2,:,:]) + abs(phiy[:,1,:] - phiy[:,-2,:])))
+
+
     def export_to_csv(field, name):
         df = pd.DataFrame(field)
         df.to_csv(name)
@@ -451,28 +462,28 @@ for i_trajectory in range(n_data):
             nInternalPoints = (n_x-2)*(n_y-2)
             matrixToInvert = np.zeros((2*nInternalPoints, 2*nInternalPoints))
             generalMatrix = np.diag(np.ones(2*nPoints))
-            cst = beta**2/3
+            cst = beta**2/3*depth**3
             for i in range(1,n_x-1):
                 for j in range(1,n_y-1):
                     #matrix terms associated to (hu)_ij
-                    generalMatrix[j*n_x + i,j*n_x + i]   = 1 + 2*cst*depth**2/dx**2
-                    generalMatrix[j*n_x + i,j*n_x + i+1] =   -   cst*depth**2/dx**2
-                    generalMatrix[j*n_x + i,j*n_x + i-1] =   -   cst*depth**2/dx**2
+                    generalMatrix[j*n_x + i,j*n_x + i]   = 1 + 2*cst/dx**2
+                    generalMatrix[j*n_x + i,j*n_x + i+1] =   -   cst/dx**2
+                    generalMatrix[j*n_x + i,j*n_x + i-1] =   -   cst/dx**2
                     
-                    generalMatrix[j*n_x + i,nPoints+j*n_x + i]       =  cst*depth**2/dx/dy
-                    generalMatrix[j*n_x + i,nPoints+j*n_x + i+1]     = -cst*depth**2/dx/dy         
-                    generalMatrix[j*n_x + i,nPoints+(j-1)*n_x + i+1] =  cst*depth**2/dx/dy        
-                    generalMatrix[j*n_x + i,nPoints+(j-1)*n_x + i]   = -cst*depth**2/dx/dy
+                    generalMatrix[j*n_x + i,nPoints+j*n_x + i]       =  cst/dx/dy
+                    generalMatrix[j*n_x + i,nPoints+j*n_x + i+1]     = -cst/dx/dy         
+                    generalMatrix[j*n_x + i,nPoints+(j-1)*n_x + i+1] =  cst/dx/dy        
+                    generalMatrix[j*n_x + i,nPoints+(j-1)*n_x + i]   = -cst/dx/dy
 
                     #matrix terms associated to (hv)_ij
-                    generalMatrix[nPoints+j*n_x + i,nPoints+j*n_x + i]     = 1 + cst*depth**2/dy**2
-                    generalMatrix[nPoints+j*n_x + i,nPoints+(j+1)*n_x + i] =   - cst*depth**2/dy**2
-                    generalMatrix[nPoints+j*n_x + i,nPoints+(j-1)*n_x + i] =   - cst*depth**2/dy**2
+                    generalMatrix[nPoints+j*n_x + i,nPoints+j*n_x + i]     = 1 + cst/dy**2
+                    generalMatrix[nPoints+j*n_x + i,nPoints+(j+1)*n_x + i] =   - cst/dy**2
+                    generalMatrix[nPoints+j*n_x + i,nPoints+(j-1)*n_x + i] =   - cst/dy**2
                     
-                    generalMatrix[nPoints+j*n_x + i,j*n_x + i]       =  cst*depth**2/dx/dy           
-                    generalMatrix[nPoints+j*n_x + i,(j+1)*n_x + i]   = -cst*depth**2/dx/dy         
-                    generalMatrix[nPoints+j*n_x + i,(j+1)*n_x + i-1] =  cst*depth**2/dx/dy        
-                    generalMatrix[nPoints+j*n_x + i,j*n_x + i-1]     = -cst*depth**2/dx/dy          
+                    generalMatrix[nPoints+j*n_x + i,j*n_x + i]       =  cst/dx/dy           
+                    generalMatrix[nPoints+j*n_x + i,(j+1)*n_x + i]   = -cst/dx/dy         
+                    generalMatrix[nPoints+j*n_x + i,(j+1)*n_x + i-1] =  cst/dx/dy        
+                    generalMatrix[nPoints+j*n_x + i,j*n_x + i-1]     = -cst/dx/dy          
 
             for i in range(0,n_x-2):
                 for j in range(0,n_y-2):
@@ -670,7 +681,13 @@ for i_trajectory in range(n_data):
                     dhv_new_stocha[:, :, k] = enforce_boundaries(dhv_new_stocha[:, :, k], 'v')
             
             #Euler-Heun method for stochastic terms
+            
             dBt = np.random.normal(0, np.sqrt(dt), nmodes)
+            #signSelect = 2*np.random.randint(0,2,size=nmodes)-1
+            #dBt = np.sqrt(dt)*truncnorm.rvs(1, 2, size=nmodes) * signSelect
+            #dBt = np.sqrt(dt)*np.random.exponential(scale = 0.5, size=nmodes) * signSelect
+            #dBt = np.sqrt(dt)*truncexpon.rvs(2, scale=1, size=nmodes) * signSelect
+            
             hutemp[1:-1, 1:-1] = hu[1:-1, 1:-1]
             hvtemp[1:-1, 1:-1] = hv[1:-1, 1:-1]
             htemp[1:-1, 1:-1] = hc[1:-1, 1:-1]
@@ -836,32 +853,33 @@ for i_trajectory in range(n_data):
             if simulationType == "Serre-Green-Naghdi":
                 nPoints = n_x*n_y
                 nInternalPoints = (n_x-2)*(n_y-2)
-                generalMatrix = np.diag(np.ones(2*nPoints))
+                internalH = hc[1:-1,1:-1]
+                generalMatrix = np.eye(2*nPoints)
                 cst = beta**2/3
-                
-                for i in range(1,n_x-1):
-                    for j in range(1,n_y-1):
-                        #matrix terms associated to (hu)_ij
-                        generalMatrix[j*n_x + i,j*n_x + i]   = 1 + cst*(hc[j,i]**3 + hc[j,i+1]**3)/dx**2   / localx_h[j,i]
-                        generalMatrix[j*n_x + i,j*n_x + i+1] =   - cst* hc[j,i+1]**3/dx**2                 / localx_h[j,i+1]
-                        generalMatrix[j*n_x + i,j*n_x + i-1] =   - cst* hc[j,i]**3/dx**2                   / localx_h[j,i-1]
-                        
-                        generalMatrix[j*n_x + i,nPoints+j*n_x + i]       =  cst*hc[j,i]**3/dx/dy           / localy_h[j,i]
-                        generalMatrix[j*n_x + i,nPoints+j*n_x + i+1]     = -cst*hc[j,i+1]**3/dx/dy         / localy_h[j,i+1]
-                        generalMatrix[j*n_x + i,nPoints+(j-1)*n_x + i+1] =  cst*hc[j,i+1]**3/dx/dy         / localy_h[j-1,i+1]
-                        generalMatrix[j*n_x + i,nPoints+(j-1)*n_x + i]   = -cst*hc[j,i]**3/dx/dy           / localy_h[j-1,i]
-
-                        #matrix terms associated to (hv)_ij
-                        generalMatrix[nPoints+j*n_x + i,nPoints+j*n_x + i]     = 1 + cst*(hc[j,i]**3 + hc[j+1,i]**3)/dy**2   / localy_h[j,i]
-                        generalMatrix[nPoints+j*n_x + i,nPoints+(j+1)*n_x + i] =   - cst* hc[j+1,i]**3/dy**2                 / localy_h[j+1,i]
-                        generalMatrix[nPoints+j*n_x + i,nPoints+(j-1)*n_x + i] =   - cst* hc[j,i]**3/dy**2                   / localy_h[j-1,i]
-                        
-                        generalMatrix[nPoints+j*n_x + i,j*n_x + i]       =  cst*hc[j,i]**3/dx/dy           / localx_h[j,i]
-                        generalMatrix[nPoints+j*n_x + i,(j+1)*n_x + i]   = -cst*hc[j+1,i]**3/dx/dy         / localx_h[j+1,i]
-                        generalMatrix[nPoints+j*n_x + i,(j+1)*n_x + i-1] =  cst*hc[j+1,i]**3/dx/dy         / localx_h[j+1,i-1]
-                        generalMatrix[nPoints+j*n_x + i,j*n_x + i-1]     = -cst*hc[j,i]**3/dx/dy           / localx_h[j,i-1]
-
                 if not(periodic_boundary_x) and not(periodic_boundary_y):
+
+                    for i in range(1,n_x-1):
+                        for j in range(1,n_y-1):
+                            #matrix terms associated to (hu)_ij
+                            generalMatrix[j*n_x + i,j*n_x + i]   = 1 + cst*(internalH[j,i]**3 + internalH[j,i+1]**3)/dx**2
+                            generalMatrix[j*n_x + i,j*n_x + i+1] =   - cst* internalH[j,i+1]**3/dx**2              
+                            generalMatrix[j*n_x + i,j*n_x + i-1] =   - cst* internalH[j,i]**3/dx**2               
+                            
+                            generalMatrix[j*n_x + i,nPoints+j*n_x + i]       =  cst*internalH[j,i]**3/dx/dy        
+                            generalMatrix[j*n_x + i,nPoints+j*n_x + i+1]     = -cst*internalH[j,i+1]**3/dx/dy       
+                            generalMatrix[j*n_x + i,nPoints+(j-1)*n_x + i+1] =  cst*internalH[j,i+1]**3/dx/dy        
+                            generalMatrix[j*n_x + i,nPoints+(j-1)*n_x + i]   = -cst*internalH[j,i]**3/dx/dy           
+
+                            #matrix terms associated to (hv)_ij
+                            generalMatrix[nPoints+j*n_x + i,nPoints+j*n_x + i]     = 1 + cst*(internalH[j,i]**3 + internalH[j+1,i]**3)/dy**2 
+                            generalMatrix[nPoints+j*n_x + i,nPoints+(j+1)*n_x + i] =   - cst* internalH[j+1,i]**3/dy**2                
+                            generalMatrix[nPoints+j*n_x + i,nPoints+(j-1)*n_x + i] =   - cst* internalH[j,i]**3/dy**2                  
+                            
+                            generalMatrix[nPoints+j*n_x + i,j*n_x + i]       =  cst*internalH[j,i]**3/dx/dy           
+                            generalMatrix[nPoints+j*n_x + i,(j+1)*n_x + i]   = -cst*internalH[j+1,i]**3/dx/dy         
+                            generalMatrix[nPoints+j*n_x + i,(j+1)*n_x + i-1] =  cst*internalH[j+1,i]**3/dx/dy        
+                            generalMatrix[nPoints+j*n_x + i,j*n_x + i-1]     = -cst*internalH[j,i]**3/dx/dy          
+
                     dmom = np.concatenate((nx.reshape(dhu_new[1:-1,1:-1], (nInternalPoints,)), nx.reshape(dhv_new[1:-1,1:-1], (nInternalPoints,))))
                     matrixToInvert = np.zeros((2*nInternalPoints, 2*nInternalPoints))
                     for i in range(0,n_x-2):
@@ -888,7 +906,33 @@ for i_trajectory in range(n_data):
                         dhv_new_stocha[:, :, k] = enforce_boundaries(dhv_new_stocha[:,:,k], 'v')
 
                 elif periodic_boundary_x and periodic_boundary_y:
-                    dmom = np.concatenate((nx.reshape(dhu_new, (nPoints,)), nx.reshape(dhv_new, (nPoints,))))
+                    dmom = np.concatenate((nx.reshape(dhu_new[1:-1,1:-1], (nInternalPoints,)), nx.reshape(dhv_new[1:-1,1:-1], (nInternalPoints,))))
+                    internalH = hc[1:-1,1:-1]
+                    internalLocalHx = localx_h[1:-1,1:-1]
+                    internalLocalHy = localy_h[1:-1,1:-1]
+                    generalMatrix = np.zeros((2*nInternalPoints, 2*nInternalPoints))
+                    for i in range(n_x-2):
+                        for j in range(n_y-2):
+                            #matrix terms associated to (hu)_ij
+                            generalMatrix[j*(n_x-2) + i,j*(n_x-2) + i]             = 1 + cst*(internalH[j,i]**3 + internalH[j,(i+1)%(n_x-2)]**3)/dx**2   / internalLocalHx[j,i]
+                            generalMatrix[j*(n_x-2) + i,j*(n_x-2) + (i+1)%(n_x-2)] =   - cst* internalH[j,(i+1)%(n_x-2)]**3/dx**2                        / internalLocalHx[j,(i+1)%(n_x-2)]
+                            generalMatrix[j*(n_x-2) + i,j*(n_x-2) + (i-1)%(n_x-2)] =   - cst* internalH[j,i]**3/dx**2                                    / internalLocalHx[j,(i-1)%(n_x-2)]
+                            
+                            generalMatrix[j*(n_x-2) + i,nInternalPoints+j*(n_x-2) + i]                         =  cst*internalH[j,i]**3/dx/dy               / internalLocalHy[j,i]
+                            generalMatrix[j*(n_x-2) + i,nInternalPoints+j*(n_x-2) + (i+1)%(n_x-2)]             = -cst*internalH[j,(i+1)%(n_x-2)]**3/dx/dy   / internalLocalHy[j,(i+1)%(n_x-2)]
+                            generalMatrix[j*(n_x-2) + i,nInternalPoints+(j-1)%(n_y-2)*(n_x-2) + (i+1)%(n_x-2)] =  cst*internalH[j,(i+1)%(n_x-2)]**3/dx/dy   / internalLocalHy[(j-1)%(n_y-2),(i+1)%(n_x-2)]
+                            generalMatrix[j*(n_x-2) + i,nInternalPoints+(j-1)%(n_y-2)*(n_x-2) + i]             = -cst*internalH[j,i]**3/dx/dy               / internalLocalHy[(j-1)%(n_y-2),i]
+
+                            #matrix terms associated to (hv)_ij
+                            generalMatrix[nInternalPoints+j*(n_x-2) + i,nInternalPoints+j*(n_x-2) + i]                 = 1 + cst*(hc[j,i]**3 + hc[(j+1)%(n_y-2),i]**3)/dy**2   / internalLocalHy[j,i]
+                            generalMatrix[nInternalPoints+j*(n_x-2) + i,nInternalPoints+(j+1)%(n_y-2)*(n_x-2) + i]     =   - cst* hc[(j+1)%(n_y-2),i]**3/dy**2                 / internalLocalHy[(j+1)%(n_y-2),i]
+                            generalMatrix[nInternalPoints+j*(n_x-2) + i,nInternalPoints+(j-1)%(n_y-2)*(n_x-2) + i]     =   - cst* hc[j,i]**3/dy**2                             / internalLocalHy[(j-1)%(n_y-2),i]
+                            
+                            generalMatrix[nInternalPoints+j*(n_x-2) + i,j*(n_x-2) + i]                         =  cst*hc[j,i]**3/dx/dy              / internalLocalHx[j,i]
+                            generalMatrix[nInternalPoints+j*(n_x-2) + i,(j+1)%(n_y-2)*(n_x-2) + i]             = -cst*hc[(j+1)%(n_y-2),i]**3/dx/dy  / internalLocalHx[(j+1)%(n_y-2),i]
+                            generalMatrix[nInternalPoints+j*(n_x-2) + i,(j+1)%(n_y-2)*(n_x-2) + (i-1)%(n_x-2)] =  cst*hc[(j+1)%(n_y-2),i]**3/dx/dy  / internalLocalHx[(j+1)%(n_y-2),(i-1)%(n_x-2)]
+                            generalMatrix[nInternalPoints+j*(n_x-2) + i,j*(n_x-2) + (i-1)%(n_x-2)]             = -cst*hc[j,i]**3/dx/dy              / internalLocalHx[j,(i-1)%(n_x-2)]
+                    
                     matrixToInvert = scsp.csr_matrix(generalMatrix)
 
                     #direct method
@@ -916,13 +960,13 @@ for i_trajectory in range(n_data):
                         vector = scsp.linalg.spsolve(lowerPart, dmom - upperPart @ vector)
                     dmom = vector.copy()"""
 
-                    dhu_new = nx.reshape(dmom[:nPoints ], (n_y, n_x))
-                    dhv_new = nx.reshape(dmom[ nPoints:], (n_y, n_x))
+                    dhu_new[1:-1,1:-1] = nx.reshape(dmom[:nInternalPoints ], (n_y-2, n_x-2))
+                    dhv_new[1:-1,1:-1] = nx.reshape(dmom[ nInternalPoints:], (n_y-2, n_x-2))
                     dhu_new = enforce_boundaries(dhu_new, 'u')
                     dhv_new = enforce_boundaries(dhv_new, 'v')
 
                     for k in range(nmodes):
-                        dmomStocha = np.concatenate((nx.reshape(dhu_new_stocha[:,:, k], (nPoints,)), nx.reshape(dhv_new_stocha[:,:, k], (nPoints,)))).copy()
+                        dmomStocha = np.concatenate((nx.reshape(dhu_new_stocha[1:-1,1:-1, k], (nInternalPoints,)), nx.reshape(dhv_new_stocha[1:-1,1:-1, k], (nInternalPoints,)))).copy()
                         
                         #direct method
                         dmomStocha = scsp.linalg.spsolve(matrixToInvert, dmomStocha)
@@ -941,8 +985,8 @@ for i_trajectory in range(n_data):
                             vector = scsp.linalg.spsolve(lowerPart, dmomStocha - upperPart @ vector)
                         dmomStocha = vector.copy()"""
                         
-                        dhu_new_stocha[:, :, k] = nx.reshape(dmomStocha[:nPoints ], (n_y, n_x))
-                        dhv_new_stocha[:, :, k] = nx.reshape(dmomStocha[ nPoints:], (n_y, n_x))
+                        dhu_new_stocha[1:-1,1:-1, k] = nx.reshape(dmomStocha[:nInternalPoints ], (n_y-2, n_x-2))
+                        dhv_new_stocha[1:-1,1:-1, k] = nx.reshape(dmomStocha[ nInternalPoints:], (n_y-2, n_x-2))
                         dhu_new_stocha[:, :, k] = enforce_boundaries(dhu_new_stocha[:,:,k], 'u')
                         dhv_new_stocha[:, :, k] = enforce_boundaries(dhv_new_stocha[:,:,k], 'v')
 

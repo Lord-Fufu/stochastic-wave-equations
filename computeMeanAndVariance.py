@@ -5,9 +5,8 @@ import os
 
 dir_deter='data_deterministic'
 specDeter = pd.read_csv(dir_deter + '//spec.csv').to_numpy()
-itmax = 500
-nstep = 50
-itstep = itmax//nstep
+itmax = 700
+nstep = 71
 dir_to_store = 'data_stats'
 
 try:
@@ -41,7 +40,7 @@ xmomDeter = df_xmomDet.to_numpy()[:,1:]
 ymomDeter = df_ymomDet.to_numpy()[:,1:]
 
 n_data=100
-for k in range(0,itmax,itstep):
+for k in range(0,nstep):
     print(k)
     df_heightDet = pd.read_csv(dir_deter + '//height//'+str(k)+'.csv')
     df_xmomDet = pd.read_csv(dir_deter + '//xmom//'+str(k)+'.csv')

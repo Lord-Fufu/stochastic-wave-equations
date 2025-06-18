@@ -4,15 +4,14 @@ import matplotlib.pyplot as plt
 
 dir_deter='data_deterministic'
 specDeter = pd.read_csv(dir_deter + '//spec.csv').to_numpy()
-itmax = 500
-nstep = 50
-itstep = itmax//nstep
+itmax = 700
+nstep = 71
 dir_to_read = 'data_stats'
 
 n_x = specDeter[0,1]
 n_y = specDeter[1,1]
-dx = specDeter[2,1]
-dy = specDeter[3,1]
+dx  = specDeter[2,1]
+dy  = specDeter[3,1]
 
 x, y = (
     np.arange(n_x) * dx,
@@ -32,13 +31,13 @@ m,n = np.shape(heightDeter)
 
 meanHeightArr = np.zeros((nstep,m,n))
 varHeightArr = np.zeros((nstep,m,n))
-for k in range(0,itmax,itstep):
+for k in range(0,nstep):
     df_mean = pd.read_csv(dir_to_read + '//mean'+str(k)+'.csv')
     df_var = pd.read_csv(dir_to_read + '//var'+str(k)+'.csv')
     meanHeight = df_mean.to_numpy()[:,1:]
     varHeight = df_var.to_numpy()[:,1:]
-    meanHeightArr[k//itstep,:,:] = meanHeight
-    varHeightArr[k//itstep,:,:] = varHeight
+    meanHeightArr[k,:,:] = meanHeight
+    varHeightArr[k,:,:] = varHeight
 def prepare_plot(rmean,rvar):
     fig, ax = plt.subplots(1, 2, figsize=(12, 5))
     cs0 = update_plot(0, meanHeightArr[0,:,:], ax[0], -rmean, rmean, draw=False)
