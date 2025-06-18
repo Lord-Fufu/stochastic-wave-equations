@@ -5,5 +5,5 @@ The file 'shallow_water_nonlinear_modifiedConservativeTrueCgrid.py' allows to do
 Saint-Venant and Boussinesq are ok, Serre-Green-Naghdi is quite slow (should be optimized in the future).
 The files 'computeMeanAndVariance.py' and 'makeStatsPlots.py' generate and plot the statistics of the aforementioned models (respectively).
 
-The files 'water_waves_LU[...].py' deals with the water waves LU equations and its approximation.
-The main model (water waves) runs but is very slow. The approximations are faster, and are based on simplifications of the Dirichlet to Neumann operator.
+The files 'water_waves_LU[...].py' deals with the water waves LU equations and its approximations.
+The main model (water waves) runs but is very slow. Its approximations are faster, and are based on simplifications of the Dirichlet to Neumann operator.
