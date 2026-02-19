@@ -24,8 +24,7 @@ from scipy.sparse.linalg import spsolve
 #Choose simulation type. Can be "Saint-Venant", "Boussinesq" or "Serre-Green-Naghdi".
 simulationType = "Saint-Venant"
 
-
-n_data=1
+n_data=50
 for i_trajectory in range(n_data):
     
     #--------------------------------------------------------------------------------------------------------------
@@ -33,7 +32,7 @@ for i_trajectory in range(n_data):
     #--------------------------------------------------------------------------------------------------------------
 
     # maximum number of timesteps
-    itmax = float('infinity') #1400
+    itmax = 30000 #float('infinity') #
 
     # grid setup
     n_x = 128
@@ -74,6 +73,7 @@ for i_trajectory in range(n_data):
     # timestep
     dt = 0.1 * min(dx, dy) / np.sqrt(gravity * depth)
     print( "\n timestep", dt, "\n")
+    #print(itmax*dt)
 
     # other parameters
     phase_speed = np.sqrt(gravity * depth)
@@ -85,6 +85,8 @@ for i_trajectory in range(n_data):
     coeffForcing = 0 #1e-6
     addForcingX = 0 #1e5
     addForcingY = 0 #-1e0
+
+    #forcingTime = 1000*dt #18000*dt
     
     Kx = np.fft.fftfreq(n_x, d=dx)
     Ky = np.fft.fftfreq(n_y, d=dy)
@@ -99,25 +101,23 @@ for i_trajectory in range(n_data):
     #--------------------------------------------------------------------------------------------------------------
 
     # save parameters
-    save_data = False
+    save_data = True
 
     if save_data:
         dir_to_store = 'data_deterministic'
         if n_data > 1:
             dir_to_store = 'data_looped//data'+str(i_trajectory)
         path_to_store=dir_to_store+'//'
-
         try:
             os.makedirs(dir_to_store)
             print(f"Directory '{dir_to_store}' created successfully.")
         except FileExistsError:
             print(f"Directory '{dir_to_store}' already exists.")
-
         os.makedirs(path_to_store + 'height')
         os.makedirs(path_to_store + 'xmom')
         os.makedirs(path_to_store + 'ymom')
         print(f"Subdirectories created successfully.")
-
+    
     # plot parameters
     plot_range = 1*amplitude
     plot_every = 10
@@ -125,7 +125,7 @@ for i_trajectory in range(n_data):
     withArrows = False
     max_quivers = 41
 
-    make_plots = True
+    make_plots = False
     save_plots = False
     makegif = False
 
@@ -134,7 +134,7 @@ for i_trajectory in range(n_data):
     plotISDIV = False
 
     ratio = (1+np.sqrt(5))/2
-
+    
     #--------------------------------------------------------------------------------------------------------------
     #---------------------------------------------INITIAL CONDITIONS-----------------------------------------------
     #--------------------------------------------------------------------------------------------------------------
@@ -164,25 +164,30 @@ for i_trajectory in range(n_data):
     #----------------------------------------------NOISE PARAMETERS------------------------------------------------
     #---------------------------------------FOR DOUBLE PERIODIC BOUNDARIES-----------------------------------------
     #--------------------------------------------------------------------------------------------------------------
-    locFFTCoeff = 1e7
-    locFFtCoeffAdd = 1e7
+    locFFTCoeff = 1e1
+    locFFtCoeffAdd = 1e1
     
     @np.vectorize
     def functionFor5on2Decrease(x,w1,w2,w3):
-        output = np.exp(-locFFTCoeff*(x-w1)**2) #+np.exp(-locFFTCoeff*(x-w2)**2)+np.exp(-locFFTCoeff*(x-w3)**2)#+5*x/(1+x)**(5/2)
-        return output/np.sqrt(locFFTCoeff*np.pi) #/3
-    def functionForAdd(x, w):
-        return np.exp(-locFFtCoeffAdd*(x-w)**2)/np.sqrt(locFFtCoeffAdd*np.pi)
+        output = np.exp(-locFFTCoeff*(x-w1)**2) #+ (w2/w1)**(-5/2)*np.exp(-locFFTCoeff*(x-w2)**2) + (w2/w1)**(-5/2)*np.exp(-locFFTCoeff*(x-w3)**2)
+        #K=0.1
+        #output = x/(1+K*x)**(5/2)
+        return output*np.sqrt(locFFTCoeff/np.pi)#/(1 + (w2/w1)**(-5/2) + (w3/w1)**(-5/2))
+        #return output*3*K/4
+    def functionForAdd(x, w1, w2, w3):
+        output = np.exp(-locFFtCoeffAdd*(x-w1)**2)# + (w2/w1)**(-5/2)*np.exp(-locFFtCoeffAdd*(x-w2)**2) + (w2/w1)**(-5/2) * np.exp(-locFFtCoeffAdd*(x-w3)**2)
+        return output*np.sqrt(locFFtCoeffAdd/np.pi)#/(1 + (w2/w1)**(-5/2) + (w3/w1)**(-5/2))
 
     if periodic_boundary_x and periodic_boundary_y:
-
-        ups = 5e7
+        ups = 1e7
         wavenumber1 = np.pi*2 #np.pi*1
-        wavenumber2 = np.pi*3
-        wavenumber3 = np.pi*5
-        upsAdd = 1e4       
+        wavenumber2 = np.pi*5
+        wavenumber3 = np.pi*10
+        upsAdd = 1e6       
         wavenumberAdd = np.pi*2
-        dampingCharTime = float('infinity') #90*60
+        wavenumberAdd2 = np.pi*5
+        wavenumberAdd3 = np.pi*10
+        dampingCharTime = float('infinity') #90*60 #20*60
 
         coeff=-2
         coeffx=0
@@ -205,21 +210,21 @@ for i_trajectory in range(n_data):
         baseFFTNoiseY*=ups/np.sqrt(np.sum(baseFFTNoiseY**2))/(dx*dy)
 
         #ADDITIVE NOISE
-        baseFFTAddNoiseX = functionForAdd(normk, wavenumberAdd/l_wave)[1:-1,1:-1]
+        baseFFTAddNoiseX = functionForAdd(normk, wavenumberAdd/l_wave, wavenumberAdd2/l_wave, wavenumberAdd3/l_wave)[1:-1,1:-1]
         baseFFTAddNoiseY = baseFFTAddNoiseX.copy()
         baseFFTAddNoiseX*=upsAdd/np.sqrt(np.sum(baseFFTAddNoiseX**2))/(dx*dy)**(1/2)
         baseFFTAddNoiseY*=upsAdd/np.sqrt(np.sum(baseFFTAddNoiseY**2))/(dx*dy)**(1/2)
 
         nCorrSteps = 10
-        memWeightCoeff = 0.9
+        memWeightCoeff = 0.5
         weightArr = memWeightCoeff**(np.arange(nCorrSteps))
 
-        nCorrStepsAdd = 1
+        nCorrStepsAdd = 50
         memWeightCoeffAdd = 0.9
         weightArrAdd = memWeightCoeffAdd**(np.arange(nCorrStepsAdd))
 
-        weightArrScaleCoeff = np.log(memWeightCoeff)/(1-memWeightCoeff**nCorrSteps)
-        weightArrScaleCoeffAdd = np.log(memWeightCoeffAdd)/(1-memWeightCoeffAdd**nCorrStepsAdd)
+        weightArrScaleCoeff = abs(np.log(memWeightCoeff)/(1-memWeightCoeff**(nCorrSteps)))
+        weightArrScaleCoeffAdd = abs(np.log(memWeightCoeffAdd)/(1-memWeightCoeffAdd**(nCorrStepsAdd)))
 
 
     #--------------------------------------------------------------------------------------------------------------
@@ -633,8 +638,8 @@ for i_trajectory in range(n_data):
             #dBtAddY = signSelectAddY * truncnorm.rvs(gapAdd, float('infinity'), loc=0, scale=np.sqrt(dt), size=baseFFTNoiseY.shape)
             
             dBt = np.random.normal(0, np.sqrt(dt), baseFFTNoiseY.shape)
-            dBtAddX = np.random.normal(0, np.sqrt(dt), baseFFTNoiseY.shape)
-            dBtAddY = np.random.normal(0, np.sqrt(dt), baseFFTNoiseY.shape)
+            dBtAddX = np.random.normal(0, np.sqrt(dt), baseFFTNoiseY.shape) #*(currentTime<forcingTime)
+            dBtAddY = np.random.normal(0, np.sqrt(dt), baseFFTNoiseY.shape) #*(currentTime<forcingTime)
             
             if currentTime < nCorrSteps*dt:
                 k = int(currentTime//dt)
@@ -1125,8 +1130,8 @@ for i_trajectory in range(n_data):
 
                 if save_data:
                     export_to_csv(h, path_to_store+'height//'+str(count)+'.csv')
-                    export_to_csv(hu, path_to_store+'xmom//'+str(count)+'.csv')
-                    export_to_csv(hv, path_to_store+'ymom//'+str(count)+'.csv')
+                    #export_to_csv(hu, path_to_store+'xmom//'+str(count)+'.csv')
+                    #export_to_csv(hv, path_to_store+'ymom//'+str(count)+'.csv')
 
                 count+=1
 
